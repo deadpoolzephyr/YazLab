@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="vBox" minHeight="-Infinity" minWidth="-Infinity" prefHeight="900.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="yazlab1.pkg01.FXMLDocumentController">
+   <children>
+       <MenuBar fx:id="menuBar" prefHeight="30.0" prefWidth="520.0">
+         <menus>
+            <Menu id="colorsMenu" fx:id="colorsMenu" mnemonicParsing="false" text="Colors">
+               <items>
+                  <MenuItem fx:id="defaultMenuItem" mnemonicParsing="false" onAction="#changeColor" text="Default" />
+               </items>
+            </Menu>
+         </menus>
+      </MenuBar>
+      <VBox fx:id="vBoxDisplayArea">
+        <AnchorPane fx:id="anchorPane" VBox.vgrow="ALWAYS" />
+      </VBox>
+   </children>
+</VBox>

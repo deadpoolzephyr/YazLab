@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "824037382585",
+    "project_id": "ny-taxi-app",
+    "storage_bucket": "ny-taxi-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:824037382585:android:639954cba781ec11b33e68",
+        "android_client_info": {
+          "package_name": "com.example.ny_taxi_flutter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "824037382585-jg0datch07urbd35ljidgbo3a4da94ti.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyoSGY8Tcp3EOQ2x_dvq53cLjFZ6e5oEo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "824037382585-jg0datch07urbd35ljidgbo3a4da94ti.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

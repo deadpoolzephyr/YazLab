@@ -1,0 +1,518 @@
+package yazlab1.pkg02;
+
+import java.util.Scanner;
+/**
+ *
+ * @author arda_
+ */
+
+
+public class YazLab102{
+    
+    private static Kontrol kontrol;
+    private static Thread kontrolThread;
+
+
+    public static void main(String[] args) {
+        // TODO code application logic here
+        Scanner input = new Scanner(System.in);
+        kontrol = Kontrol.getInstance();
+        kontrolThread = new Thread(kontrol);
+        kontrolThread.start();
+        
+        int secim;
+        
+        while(true) {
+
+            
+            System.out.println("Seçiminizi giriniz: \n 1. Asansör Durum \n 2. Asansör Çağır");
+            secim = input.nextInt();
+
+            if(secim == 1){
+            for(int i=0;i<5;i++){
+                Asansorler asansor = Kontrol.getInstance().getAsansorList().get(i);
+                System.out.println("Asansör - " + asansor.getId() + " | Anlık kat - " + asansor.getAnlikKat()
+                        + " | Durum - " + asansor.getAsansorDurum());
+            }
+            }
+
+            if(secim == 2) {
+                
+                input = new Scanner(System.in);
+                System.out.println("Çağrıldığı katı giriniz (0 - 4 arası): ");
+                int istekKat = input.nextInt();
+
+                input = new Scanner(System.in);
+                System.out.println("Hedef katı giriniz (0 - 4 arası): ");
+                int hedefKat = input.nextInt();
+
+                AsansorIstek asansorIstek = new AsansorIstek(istekKat, hedefKat);
+                Asansorler asansorler = asansorIstek.submitRequest();
+
+
+            }
+
+        }
+        
+        
+    }
+
+    
+    
+}
+
+**************************************************************************************
+
+package yazlab1.pkg02;
+
+/**
+ *
+ * @author arda_
+ */
+
+enum AsansorDurum {
+    UP,
+    DOWN,
+    STATIONARY,
+    MAINTAINANCE,
+    active
+}
+
+class AsansorIstek {
+    private int istekKat;
+    private int hedefKat;
+
+    public AsansorIstek(int istekKat, int hedefKat){
+        this.istekKat = istekKat;
+        this.hedefKat = hedefKat;
+    }
+
+    public int getIstekKat() {
+        return istekKat;
+    }
+
+    public int getHedefKat() {
+        return hedefKat;
+    }
+
+    public Asansorler submitRequest(){
+        return Kontrol.getInstance().selectElevator(this);
+    }
+}
+
+public class GirisCikis {
+    
+    
+    
+}
+
+**************************************************************************************
+
+package yazlab1.pkg02;
+
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.NavigableSet;
+
+/**
+ *
+ * @author arda_
+ */
+
+
+public class Asansorler implements Runnable{
+    
+    //5 asansörün maksimum kapasite kontroolü taşımayı sağlar
+    
+    private boolean operating;
+    private int id;
+    private AsansorDurum asansorDurum;
+    private int anlikKat;
+    
+    private NavigableSet<Integer> floorStops;
+    
+    
+    public Map<AsansorDurum, NavigableSet<Integer>> floorStopsMap;
+
+    public Asansorler(int id){
+        this.id = id;
+        setOperating(true);
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public AsansorDurum getAsansorDurum() {
+        return asansorDurum;
+    }
+
+    public int getAnlikKat() {
+        return anlikKat;
+    }
+
+    public void setAsansorDurum(AsansorDurum asansorDurum) {
+        this.asansorDurum = asansorDurum;
+    }
+
+    public boolean isOperating(){
+        return this.operating;
+    }
+
+    public void setOperating(boolean state){
+        this.operating = state;
+
+        if(!state){
+            setAsansorDurum(AsansorDurum.MAINTAINANCE);
+            this.floorStops.clear();
+        } else {
+            setAsansorDurum(AsansorDurum.STATIONARY);
+            this.floorStopsMap = new LinkedHashMap<AsansorDurum, NavigableSet<Integer>>();
+
+            // To let controller know that this elevator is ready to serve
+            Kontrol.updateAsansorList(this);
+        }
+
+        setAnlıkKat(0);
+    }
+
+    public void setAnlıkKat(int AnlıkKat) {
+        this.anlikKat = AnlıkKat;
+    }
+
+    public void move(){
+        synchronized (Kontrol.getInstance()){ // Synchronized over the Kontrol singleton.
+            Iterator<AsansorDurum> iter = floorStopsMap.keySet().iterator();
+
+            while(iter.hasNext()){
+                asansorDurum = iter.next();
+
+                // Get the floors that elevator will pass in the requested direction
+                floorStops = floorStopsMap.get(asansorDurum);
+                iter.remove();
+                Integer currFlr = null;
+                Integer nextFlr = null;
+
+                // Start moving the elevator
+                while (!floorStops.isEmpty()) {
+
+                    if (asansorDurum.equals(AsansorDurum.UP)) {
+                        currFlr = floorStops.pollFirst();
+                        nextFlr = floorStops.higher(currFlr);
+                        try {
+                        Thread.sleep(500); // Let people get in the elevator :P
+                        } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    } else if (asansorDurum.equals(AsansorDurum.DOWN)) {
+                        currFlr = floorStops.pollLast();
+                        nextFlr = floorStops.lower(currFlr);
+                    } else {
+                        return;
+                    }
+
+                    setAnlıkKat(currFlr);
+
+                    if (nextFlr != null) {
+                        // This helps us in picking up any request that might come
+                        // while we are on the way.
+                        generateIntermediateFloors(currFlr, nextFlr);
+                    } else {
+                        setAsansorDurum(AsansorDurum.STATIONARY);
+                        Kontrol.updateAsansorList(this);
+                    }
+
+                    System.out.println("Asansor ID " + this.id + " | Anlık kat - " + getAnlikKat() + " | Sonraki hareket - " + getAsansorDurum());
+
+                    try {
+                        Thread.sleep(1000); // Let people get off the elevator :P
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            try {
+                // Wait till ElevatorController has scanned the state of all elevators.
+                // This helps us to serve any intermediate requests that might come
+                // while elevators are on their respective paths.
+                Kontrol.getInstance().wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+
+    /**
+     * This method helps to generate list of floors that the elevator will
+     * either stop or pass by when in motion.
+     * @param initial
+     * @param target
+     */
+    private void generateIntermediateFloors(int initial, int target){
+
+        if(initial==target){
+            return;
+        }
+
+        if(Math.abs(initial-target) == 1){
+            return;
+        }
+
+        int n = 1;
+        if(target-initial<0){
+            // This means with are moving DOWN
+            n = -1;
+        }
+
+        while(initial!=target){
+            initial += n;
+            if(!floorStops.contains(initial)) {
+                floorStops.add(initial);
+            }
+        }
+    }
+
+    @Override
+    public void run() {
+        while(true){
+            if(isOperating()){
+                move();
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    
+    
+    
+}
+
+
+**************************************************************************************
+
+package yazlab1.pkg02;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentSkipListSet;
+/**
+ *
+ * @author arda_
+ */
+
+public class Kontrol implements Runnable{
+    
+    //Katlardaki kuyrukları kontrol eder
+    //Kuyrukta bekleyen kişilerin toplam sayısı 20'yi aştığında yeni asansörü aktif eder
+    //Kuyrukta bekleyenlerkapasitenin altına inince asansörlerden birisi pasif hale gelir
+    
+    private boolean stopController;
+
+    // All the UP moving elevators
+    private static Map<Integer, Asansorler> upMovingMap = new HashMap<Integer, Asansorler>();
+
+    // All the DOWN moving elevators
+    private static Map<Integer, Asansorler> downMovingMap = new HashMap<Integer, Asansorler>();
+    // STATIONARY elevators are part of UP and DOWN map both.
+
+    private static List<Asansorler> asansorList = new ArrayList<Asansorler>(16);
+
+    private static final Kontrol instance = new Kontrol();
+    private Kontrol(){
+        if(instance != null){
+            throw new IllegalStateException("Already instantiated");
+        }
+        setStopController(false);
+        initializeElevators();
+    }
+
+    public static Kontrol getInstance(){
+        return instance;
+    }
+
+    /**
+     * Select an elevator from the pool of operational elevators that can serve the
+     * the request optimally
+     * @param elevatorRequest  Represents the request for an elevator
+     * @return Selected Elevator
+     */
+    public synchronized Asansorler selectElevator(AsansorIstek asansorIstek) {
+
+        Asansorler asansor = null;
+
+        AsansorDurum asansorDurum = getRequestedElevatorDirection(asansorIstek);
+        int istekKat = asansorIstek.getIstekKat();
+        int hedefKat = asansorIstek.getHedefKat();
+
+        asansor = findElevator(asansorDurum, istekKat, hedefKat);
+
+        // So that elevators can start moving again.
+        notifyAll();
+        return asansor;
+
+
+    }
+
+    private static void initializeElevators(){
+        for(int i=0; i<5; i++){
+            Asansorler asansor = new Asansorler(i);
+            Thread t = new Thread(asansor);
+            t.start();
+
+            asansorList.add(asansor);
+        }
+    }
+
+    private static AsansorDurum getRequestedElevatorDirection(AsansorIstek asansorIstek){
+        AsansorDurum asansorDurum = null;
+        int istekKat = asansorIstek.getIstekKat();
+        int hedefKat = asansorIstek.getHedefKat();
+        
+        if(hedefKat>=0 && hedefKat<5 && istekKat>=0 && istekKat<5){
+            if(hedefKat - istekKat > 0){
+                asansorDurum = AsansorDurum.UP;
+            } else {
+                asansorDurum = AsansorDurum.DOWN;
+            }
+        }
+        return asansorDurum;
+    }
+
+    /**
+     * Internal method to select an elevator and generate UP and/or DOWN paths for it.
+     * @param elevatorState UP, DOWN or STATIONARY
+     * @param requestedFloor Floor number where request is originating from
+     * @param targetFloor Floor number where user wants to go
+     * @return selected elevator
+     */
+    private static Asansorler findElevator(AsansorDurum asansorDurum, int istekKat, int hedefKat) {
+        Asansorler asansor = null;
+
+        // Data structure to hold distance of eligible elevators from the request floor
+        // The keys represent the current distance of an elevator from request floor
+        TreeMap<Integer, Integer> sortedKeyMap = new TreeMap<Integer, Integer>();
+
+        if(asansorDurum.equals(AsansorDurum.UP)){
+
+            // Let's go over all elevators that are either going UP or are STATIONARY
+            for(Map.Entry<Integer, Asansorler> elvMap : upMovingMap.entrySet()){
+                Asansorler elv = elvMap.getValue();
+                Integer distance = istekKat - elv.getAnlikKat();
+                if(distance < 0 && elv.getAsansorDurum().equals(AsansorDurum.UP)){
+                    // No point selecting these elevators. They have already passed by our request floor
+                    continue;
+                } else {
+                    sortedKeyMap.put(Math.abs(distance), elv.getId());
+                }
+            }
+
+            // TODO - potential NullPointerException
+            Integer selectedElevatorId = sortedKeyMap.firstEntry().getValue();
+            asansor = upMovingMap.get(selectedElevatorId);
+
+
+        } else if(asansorDurum.equals(AsansorDurum.DOWN)){
+            // Let's go over all elevators that are either going DOWN or are STATIONARY
+            for(Map.Entry<Integer, Asansorler> elvMap : downMovingMap.entrySet()){
+                Asansorler elv = elvMap.getValue();
+                Integer distance = elv.getAnlikKat() - istekKat;
+                if(distance < 0 && elv.getAsansorDurum().equals(AsansorDurum.DOWN)){
+                    // No point selecting these elevators. They have already passed by our requested floor
+                    continue;
+                } else {
+                    sortedKeyMap.put(Math.abs(distance), elv.getId());
+                }
+            }
+            // TODO - potential NullPointerException
+            Integer selectedElevatorId = sortedKeyMap.firstEntry().getValue();
+            asansor = downMovingMap.get(selectedElevatorId);
+
+        }
+
+        // Instructing the selected elevator to stop/pass by relavent floors
+        AsansorIstek newRequest = new AsansorIstek(asansor.getAnlikKat(), istekKat);
+        AsansorDurum elevatorDirection = getRequestedElevatorDirection(newRequest);
+
+        // helpful if we are moving in opposite direction to than that of request
+        AsansorIstek newRequest2 = new AsansorIstek(istekKat, hedefKat);
+        AsansorDurum elevatorDirection2 = getRequestedElevatorDirection(newRequest2);
+
+        NavigableSet<Integer> floorSet = asansor.floorStopsMap.get(elevatorDirection);
+        if (floorSet == null) {
+            floorSet = new ConcurrentSkipListSet<Integer>();
+        }
+
+        floorSet.add(asansor.getAnlikKat());
+        floorSet.add(istekKat);
+        asansor.floorStopsMap.put(elevatorDirection, floorSet);
+
+        NavigableSet<Integer> floorSet2 = asansor.floorStopsMap.get(elevatorDirection2);
+        if (floorSet2 == null) {
+            floorSet2 = new ConcurrentSkipListSet<Integer>();
+        }
+
+        floorSet2.add(istekKat);
+        floorSet2.add(hedefKat);
+        asansor.floorStopsMap.put(elevatorDirection2, floorSet2);
+
+        return asansor;
+    }
+
+    
+    public static synchronized void updateAsansorList(Asansorler asansor){
+        if(asansor.getAsansorDurum().equals(AsansorDurum.UP)){
+            upMovingMap.put(asansor.getId(), asansor);
+            downMovingMap.remove(asansor.getId());
+        } else if(asansor.getAsansorDurum().equals(AsansorDurum.DOWN)){
+            downMovingMap.put(asansor.getId(), asansor);
+            upMovingMap.remove(asansor.getId());
+        } else if (asansor.getAsansorDurum().equals(AsansorDurum.STATIONARY)){
+            upMovingMap.put(asansor.getId(), asansor);
+            downMovingMap.put(asansor.getId(),asansor);
+        } else if (asansor.getAsansorDurum().equals(AsansorDurum.MAINTAINANCE)){
+            upMovingMap.remove(asansor.getId());
+            downMovingMap.remove(asansor.getId());
+        }
+    }
+
+    @Override
+    public void run() {
+        stopController =  false;
+        while(true){
+            try {
+                Thread.sleep(200);
+                if(stopController){
+                    break;
+                }
+            } catch (InterruptedException e){
+                System.out.println(e.getStackTrace());
+            }
+        }
+    }
+
+    public void setStopController(boolean stop){
+        this.stopController = stop;
+
+    }
+
+    public synchronized List<Asansorler> getAsansorList() {
+        return asansorList;
+    }
+
+    public boolean isStopController() {
+        return stopController;
+    }
+    
+    
+}
+
+
+**************************************************************************************
